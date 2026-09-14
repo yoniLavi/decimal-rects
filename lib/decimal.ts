@@ -215,6 +215,16 @@ export function promote(rows: Rows): Rows | null {
   return r;
 }
 
+/**
+ * The inverse of promoting into 1 whole: break the whole bar back up so its
+ * last tenth becomes a full row of ten hundredths, [10] → [9, 10]. Promote
+ * puts it back together. Returns null unless the bar is 1 whole.
+ */
+export function breakWhole(rows: Rows): Rows | null {
+  if (!isWhole(rows)) return null;
+  return [FULL - 1, FULL];
+}
+
 /** Window of row `idx` (the slice of the unit that row magnifies). */
 export function windowOf(rows: Rows, idx: number, max = 12): { lo: string; hi: string } {
   if (idx === 0) return { lo: "0", hi: "1" };

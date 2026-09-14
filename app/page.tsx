@@ -5,6 +5,7 @@ import RowBar, { levelColor } from "@/components/RowBar";
 import type { Rows } from "@/lib/decimal";
 import {
   appendBlock,
+  breakWhole,
   clickPiece,
   decimalString,
   detectPeriod,
@@ -60,11 +61,24 @@ export default function DecimalPage() {
   const frac = useMemo(() => fractionParts(rows), [rows]);
   const period = useMemo(() => detectPeriod(rows), [rows]);
 
-  // Measure the width available to the row bars.
+  // Measure the width available to the row bars: the content box of a row
+  // card, i.e. the rows column minus each card's horizontal padding + border.
   useEffect(() => {
     const el = rowsElRef.current;
     if (!el) return;
-    const update = () => setWidth(Math.floor(el.getBoundingClientRect().width));
+    const update = () => {
+      let w = el.getBoundingClientRect().width;
+      const card = el.querySelector<HTMLElement>(".row");
+      if (card) {
+        const cs = getComputedStyle(card);
+        w -=
+          parseFloat(cs.paddingLeft) +
+          parseFloat(cs.paddingRight) +
+          parseFloat(cs.borderLeftWidth) +
+          parseFloat(cs.borderRightWidth);
+      }
+      setWidth(Math.max(0, Math.floor(w)));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -98,8 +112,19 @@ export default function DecimalPage() {
     return true;
   }
 
+  /** Clicking "1 whole" breaks it back up — the inverse of the last promote. */
+  function breakUpWhole() {
+    const next = breakWhole(rowsRef.current);
+    if (!next) return;
+    pushHistory(rowsRef.current);
+    commit(next);
+    flashRow(1); // the new full row of ten hundredths
+  }
+
   function beginStroke(idx: number, j: number) {
     if (busyRef.current) return;
+    // A single tap, not a drag stroke: the rows under the pointer change shape.
+    if (isWhole(rowsRef.current)) return breakUpWhole();
     if (!applyPiece(idx, j, true)) return; // deliberate no-op (e.g. 10th piece on a full row)
     strokeRef.current = { active: true, idx, appliedJ: j, changed: true };
   }
@@ -384,7 +409,7 @@ export default function DecimalPage() {
                   </span>
                   {rowFull ? (
                     whole ? (
-                      <span className="badge">full bar — that&apos;s 1 whole</span>
+                      <span className="badge">full bar — that&apos;s 1 whole · click it to break it up</span>
                     ) : (
                       <span className="badge">full — tap ▲ Promote to move it up</span>
                     )
@@ -438,7 +463,7 @@ export default function DecimalPage() {
           )}
           {whole && (
             <span className="note">
-              The bar is full — that&apos;s exactly 1 whole. Clear it to build again.
+              The bar is full — that&apos;s exactly 1 whole. Click it to break it back up, or Clear to build again.
             </span>
           )}
           {bottomFull && !cascading && (

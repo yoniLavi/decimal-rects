@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import {
   appendBlock,
+  breakWhole,
   cellLabel,
   clickPiece,
   decimalString,
@@ -83,6 +84,12 @@ assert.equal(decimalString([9, 10]), "1");
 // whole bar
 assert.deepEqual(clickPiece([9], 0, 9), [10], "ten tenths → the full bar");
 assert.equal(clickPiece([10], 0, 9), null, "whole bar is inert");
+
+// breaking 1 whole back up is the inverse of the final promote
+assert.deepEqual(breakWhole([10]), [9, 10], "1 whole → 9 tenths + ten hundredths");
+assert.equal(decimalString(breakWhole([10])!), "1", "breaking up preserves the value");
+assert.deepEqual(promote(breakWhole([10])!), [10], "promote puts it back together");
+assert.equal(breakWhole([9, 10]), null, "only the whole bar breaks up");
 
 // --- windows & labels --------------------------------------------------------
 

@@ -19,6 +19,7 @@ Try it live: **https://yonilavi.github.io/decimal-rects/** — or locally at
   and the app suggests `0.(3)… = 1/3`.
 - **0.999… = 1** — fill nine in every row, fill the deepest row's 10th piece,
   tap **▲ Promote**, and watch each full row bubble up until the bar is **1 whole**.
+  Click **1 whole** to break it back up into 9 tenths plus ten hundredths.
 
 ## The model
 
@@ -30,8 +31,9 @@ Try it live: **https://yonilavi.github.io/decimal-rects/** — or locally at
   end right after it (further right adds, further left removes, clicking the
   run's tip steps it back so digits can shrink to 0). Clicking any row edits
   just that digit — digits below it stay (they are part of the number).
-- **Colours per level** (blue = tenths, green = hundredths, amber =
-  thousandths…). A higher row's partially-used piece shows the finer rows'
+- **Colours per level** (green = tenths, teal = hundredths, blue =
+  thousandths, then magenta, red, amber… — each level steps ~17% around the
+  colour wheel, at equal perceived brightness). A higher row's partially-used piece shows the finer rows'
   colours nested inside it, so you can see where every digit came from. Fills
   are drawn pixel-exact, so edges end exactly at the true value.
 - **Full rows are stable.** Clicking a row's dashed 10th piece fills it

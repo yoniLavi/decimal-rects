@@ -4,38 +4,92 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Rows } from "@/lib/decimal";
 import { FULL, cellLabel, isWhole, placeLabel } from "@/lib/decimal";
 
-/** One colour per decimal level (row). Blue = tenths, green = hundredths, … */
-export const LEVEL_COLORS = [
-  "#2563eb", // tenths
-  "#059669", // hundredths
-  "#d97706", // thousandths
-  "#7c3aed", // ten-thousandths
-  "#db2777", // hundred-thousandths
-  "#0e7490", // millionths
-  "#ea580c", // ten-millionths
-  "#4f46e5", // hundred-millionths
-];
+/**
+ * One colour per decimal level (row): a rainbow walk around the OKLCH hue
+ * wheel, ~17% (61.2°) per level — green, teal, blue, magenta, red, amber —
+ * so the 7th level lands just past green again without quite repeating.
+ * OKLCH lightness is perceptual, so holding it fixed keeps every level equally
+ * bright (no glaring yellow next to a heavy blue).
+ */
+const HUE_START = 150;
+const HUE_STEP = 61.2;
+const LIGHTNESS = 0.58;
+const CHROMA = 0.16;
 
-export function levelColor(level: number): string {
-  if (level < LEVEL_COLORS.length) return LEVEL_COLORS[level];
-  // deeper levels: rotate hue so colours stay distinct
-  const hue = (level * 137.508) % 360;
-  return `hsl(${hue.toFixed(1)} 58% 45%)`;
+const TEXT_DARK = "#17203a";
+const TEXT_LIGHT = "#ffffff";
+
+const srgbToLinear = (x: number) =>
+  x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+const linearToSrgb = (x: number) =>
+  x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055;
+
+function oklchToLinearRgb(L: number, C: number, hueDeg: number): number[] {
+  const h = (hueDeg * Math.PI) / 180;
+  const a = C * Math.cos(h);
+  const b = C * Math.sin(h);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
 }
 
-function luminance(color: string): number {
-  const m = /^#?([0-9a-f]{6})$/i.exec(color);
-  if (!m) return 0.35; // hsl fallback: mid-dark, white text is fine
-  const n = parseInt(m[1], 16);
-  const r = ((n >> 16) & 255) / 255;
-  const g = ((n >> 8) & 255) / 255;
-  const b = (n & 255) / 255;
+/** OKLCH → sRGB hex, lowering chroma (keeping lightness + hue) if out of gamut. */
+function oklchToHex(L: number, C: number, hueDeg: number): string {
+  const inGamut = (rgb: number[]) => rgb.every((v) => v >= 0 && v <= 1);
+  let rgb = oklchToLinearRgb(L, C, hueDeg);
+  if (!inGamut(rgb)) {
+    let lo = 0;
+    let hi = C;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      if (inGamut(oklchToLinearRgb(L, mid, hueDeg))) lo = mid;
+      else hi = mid;
+    }
+    rgb = oklchToLinearRgb(L, lo, hueDeg);
+  }
+  return (
+    "#" +
+    rgb
+      .map((v) =>
+        Math.round(linearToSrgb(Math.min(1, Math.max(0, v))) * 255)
+          .toString(16)
+          .padStart(2, "0")
+      )
+      .join("")
+  );
+}
+
+const levelColorCache = new Map<number, string>();
+
+export function levelColor(level: number): string {
+  let color = levelColorCache.get(level);
+  if (!color) {
+    color = oklchToHex(LIGHTNESS, CHROMA, (HUE_START + level * HUE_STEP) % 360);
+    levelColorCache.set(level, color);
+  }
+  return color;
+}
+
+/** WCAG relative luminance of a #rrggbb colour. */
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) =>
+    srgbToLinear(c / 255)
+  );
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** A readable text colour to sit on top of a level colour. */
+/** A readable text colour to sit on top of a level colour (higher WCAG contrast wins). */
 export function textOn(color: string): string {
-  return luminance(color) > 0.58 ? "#17203a" : "#ffffff";
+  const y = luminance(color);
+  const onLight = 1.05 / (y + 0.05);
+  const onDark = (y + 0.05) / (luminance(TEXT_DARK) + 0.05);
+  return onLight >= onDark ? TEXT_LIGHT : TEXT_DARK;
 }
 
 interface Band {
@@ -221,7 +275,9 @@ export default function RowBar({
       }
     >
       <title>
-        {isFullRow
+        {whole
+          ? "1 whole — click to break it back up: 9 tenths plus a full row of ten hundredths."
+          : isFullRow
           ? `Row ${idx + 1} is full: ten of these pieces make one of the row above. Tap “Promote” to move it up.`
           : `Row ${idx + 1}: click a piece to set this digit (the run fills through it); click the edge of the run to step it back. The dashed 10th piece fills the row completely.`}
       </title>
