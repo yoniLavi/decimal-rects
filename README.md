@@ -8,7 +8,8 @@ each row magnifying the next blank slice of the unit to full width. Every fill
 updates a live readout with the exact decimal (and its fraction), so a kid can
 *see* what `0.43` or `0.333…` really means.
 
-Try it: **http://localhost:3000** after `pnpm dev`.
+Try it live: **https://yonilavi.github.io/decimal-rects/** — or locally at
+**http://localhost:3000** after `pnpm dev`.
 
 ## Try these
 
